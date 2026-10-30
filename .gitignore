@@ -1,0 +1,18 @@
+# PyInstaller build output - large binaries, not for git
+dist/
+build/
+*.spec
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# pip
+*.egg-info/
+
+# Bundled runtime DLL (build artifact, not source)
+vcruntime140.dll
+
+# Built installers - published as GitHub release assets, not committed
+releases/
