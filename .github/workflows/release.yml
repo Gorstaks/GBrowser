@@ -1,0 +1,38 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Ensure Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Build
+        shell: pwsh
+        run: |
+          pip install PyQt6 PyQt6-WebEngine pywin32 pyinstaller
+          $vcr = python -c "import PyQt6,os;print(os.path.join(os.path.dirname(PyQt6.__file__),'Qt6','bin','vcruntime140.dll'))"
+          $a = @('--noconfirm','--onedir','--windowed','--name','GBrowser','--icon','GBrowser.ico','--collect-all','PyQt6','--add-data','blocklist.txt;.')
+          if (Test-Path $vcr) { $a += @('--add-binary', "$vcr;.") }
+          pyinstaller @a GBrowser.py
+          if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed' }
+          Copy-Item blocklist.txt, GBrowser.ico dist\GBrowser\ -Force
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" GBrowser.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed' }
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = @(Get-ChildItem releases\*\*.exe -File | ForEach-Object FullName)
+          if ($files.Count -eq 0) { throw 'No release files produced' }
+          gh release create $env:GITHUB_REF_NAME @files --title $env:GITHUB_REF_NAME --generate-notes
